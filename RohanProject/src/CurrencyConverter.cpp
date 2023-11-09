@@ -1,5 +1,7 @@
 #include <iostream>
 #include <curl/curl.h>
+#include <iomanip>
+#include <fstream>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -30,14 +32,36 @@ double getExchangeRate(const std::string& baseCurrency, const std::string& targe
 
         if (res != CURLE_OK) {
             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-        } else {
+            std::cout << "Attempting to use dummy rates..." << std::endl;
 
+            std::ifstream file("DummyRates.json", std::ifstream::in);
+
+            if (file.is_open()) {
+                json j;
+                file >> j;
+                if (j.contains("rates") && j["rates"].contains(baseCurrency) && j["rates"][baseCurrency].contains(targetCurrency)) {
+                    exchangeRate = j["rates"][baseCurrency][targetCurrency];
+                }
+                file.close();
+            }
+        } else {
             json j = json::parse(readBuffer);
 
             if (j["rates"].contains(targetCurrency)) {
                 exchangeRate = j["rates"][targetCurrency];
             } else {
-                std::cout << "Limited Access Error!Please Upgrade API Key To Use This Base." << std::endl;
+                std::cout << "Target currency not found in API response. Attempting to use dummy rates..." << std::endl;
+
+                std::ifstream file("DummyRates.json", std::ifstream::in);
+
+                if (file.is_open()) {
+                    json j;
+                    file >> j;
+                    if (j.contains("rates") && j["rates"].contains(baseCurrency) && j["rates"][baseCurrency].contains(targetCurrency)) {
+                        exchangeRate = j["rates"][baseCurrency][targetCurrency];
+                    }
+                    file.close();
+                }
             }
         }
 
@@ -85,5 +109,4 @@ int main() {
 
     return 0;
 }
-       
 
