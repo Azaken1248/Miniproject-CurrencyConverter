@@ -1,7 +1,5 @@
 #include <iostream>
 #include <curl/curl.h>
-#include <iomanip>
-#include <fstream>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -14,7 +12,7 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
 double getExchangeRate(const std::string& baseCurrency, const std::string& targetCurrency) {
     CURL* curl;
     CURLcode res;
-    std::string url = "http://api.exchangeratesapi.io/v1/latest?access_key=68e6afe9e1ed12672c57dff62e5d544d&base=" + baseCurrency;
+    std::string url = "http://api.exchangeratesapi.io/v1/latest?access_key=68e6afe9e1ed12672c57dff62e5d544d&base=EUR";
     std::string readBuffer;
 
     curl_global_init(CURL_GLOBAL_DEFAULT);
@@ -30,39 +28,19 @@ double getExchangeRate(const std::string& baseCurrency, const std::string& targe
 
         res = curl_easy_perform(curl);
 
-        if (res != CURLE_OK) {
-            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-            std::cout << "Attempting to use dummy rates..." << std::endl;
-
-            std::ifstream file("DummyRates.json", std::ifstream::in);
-
-            if (file.is_open()) {
-                json j;
-                file >> j;
-                if (j.contains("rates") && j["rates"].contains(baseCurrency) && j["rates"][baseCurrency].contains(targetCurrency)) {
-                    exchangeRate = j["rates"][baseCurrency][targetCurrency];
-                }
-                file.close();
-            }
-        } else {
+        if (res == CURLE_OK) {
             json j = json::parse(readBuffer);
 
-            if (j["rates"].contains(targetCurrency)) {
-                exchangeRate = j["rates"][targetCurrency];
+            if (j["rates"].contains(targetCurrency) && j["rates"].contains(baseCurrency)) {
+                double rateFromBaseToEUR = j["rates"][baseCurrency];
+                double rateFromTargetToEUR = j["rates"][targetCurrency];
+
+                exchangeRate = rateFromTargetToEUR / rateFromBaseToEUR;   
             } else {
-                std::cout << "Target currency not found in API response. Attempting to use dummy rates..." << std::endl;
-
-                std::ifstream file("DummyRates.json", std::ifstream::in);
-
-                if (file.is_open()) {
-                    json j;
-                    file >> j;
-                    if (j.contains("rates") && j["rates"].contains(baseCurrency) && j["rates"][baseCurrency].contains(targetCurrency)) {
-                        exchangeRate = j["rates"][baseCurrency][targetCurrency];
-                    }
-                    file.close();
-                }
+                std::cout << "Invalid currency codes. Please check your input." << std::endl;
             }
+        } else {
+            fprintf(stderr, "curl_easy_perform() failed: %s\n",  );
         }
 
         curl_easy_cleanup(curl);
@@ -72,6 +50,7 @@ double getExchangeRate(const std::string& baseCurrency, const std::string& targe
 
     return exchangeRate;
 }
+
 
 int main() {
     char choice;
